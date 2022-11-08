@@ -1,5 +1,7 @@
 ### Prerequisites
 * install ubuntu server 20.04 on VM
+![install-ubuntu-on-VM](https://user-images.githubusercontent.com/38042656/200448074-63632f1c-6b7f-4524-b750-a8140d19c0f7.png)
+
 
 ### 1. Install Java and Nginx
   - Update system packages > ```sudo apt update```
@@ -71,6 +73,9 @@
       }
     }
     ```
+    - Role (Safee) assign to use (test)
+    ![role-assigned-to-user](https://user-images.githubusercontent.com/38042656/200447966-4491c55b-ad41-4e55-a5fd-9c285e1dcb95.png)
+
     - install Logstash & start > ``` sudo apt install logstash && sudo systemctl start logstash ```
     ### 4. Install Metricbeat and configure it
     - ``` sudo apt install metricbeat=8.2.0 ```
@@ -98,6 +103,7 @@
   allow_older_versions: true # because we use ELK 8.2.0 V
   ```
   - finally run it > ```sudo service filebeat start && filebeat setup -e ```
+  ![filebeat](https://user-images.githubusercontent.com/38042656/200447478-b38821e3-4afd-4a7a-ba6d-8f67995e2117.png)
   ### . Install Heartbeat and configure it
   - ``` sudo apt install heartbeat-elastic ``` then configure it ``` vim /etc/heartbeat/heartbeat.yml ```
   ```
@@ -139,6 +145,8 @@
   allow_older_versions: true
   ```
   - Finally run it > ``` sudo service metricbeat start && heartbeat-elastic -e ```
+   ![heartbeat](https://user-images.githubusercontent.com/38042656/200447700-4b12fb17-7bd8-4f6f-a599-d731818ee61b.png)
+
   ### 6. Dashboard 1
   ![ssh-dashboard](https://user-images.githubusercontent.com/38042656/200446446-b327be83-dc7d-48ee-b562-1d7e10b00658.png)
   ### 7. Dashboard 2
