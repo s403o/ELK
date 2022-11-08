@@ -1,1 +1,146 @@
-# ELK
+### Prerequisites
+* install ubuntu server 20.04 on VM
+
+### 1. Install Java and Nginx
+  - Update system packages > ```sudo apt update```
+  - Install required package > ```sudo apt install curl wget```
+  - To run Elasticsearch, you require Java. Install Java > ``` sudo apt install openjdk-11-jdk ```
+  - Verify the installation > ``` java -version ```
+  - Kibana dashboard uses Nginx as a reverse proxy. Install Nginx webserver > ``` sudo apt install nginx ```
+
+### 2. Install and Configure Elasticsearch & Kibana
+  - Install required packages > ``` $ sudo apt install apt-transport-https ```
+  - Import the Elasticsearch PGP signing key > ``` wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo apt-key add - ```
+  - Add Elasticsearch APT repository > ``` echo "deb https://artifacts.elastic.co/packages/8.x/apt stable main" > /etc/apt/sources.list.d/elastic-8.x.list && apt update ```
+  - Install Elasticsearch & Kibana > ``` sudo apt install elasticsearch=8.2.0 && sudo apt install kibana=8.2.0 ```
+  - Edit Elasticsearch configuration file > ``` sudo vim /etc/elasticsearch/elasticsearch.yml ```
+    ```
+    network.host: localhost
+    http.port: 9200
+    xpack.security.enrollment.enabled: false
+    xpack.security.enabled: true
+    ```    
+    - reload deamon & start the service ``` sudo systemctl daemon-reload && sudo systemctl start elasticsearch ```
+    - Test it > ``` curl localhost:9200 -u elastic:elastic-password ``` **you need elastic default password here**
+    - you should see this message > 
+    
+    ```yml
+      {
+    "name" : "ubuntu-elk",
+    "cluster_name" : "elasticsearch",
+    "cluster_uuid" : "8K2kc7leQxOJAd27co1Kvw",
+    "version" : {
+      "number" : "8.2.0",
+      "build_flavor" : "default",
+      "build_type" : "deb",
+      "build_hash" : "b174af62e8dd9f4ac4d25875e9381ffe2b9282c5",
+      "build_date" : "2022-04-20T10:35:10.180408517Z",
+      "build_snapshot" : false,
+      "lucene_version" : "9.1.0",
+      "minimum_wire_compatibility_version" : "7.17.0",
+      "minimum_index_compatibility_version" : "7.0.0"
+    },
+    "tagline" : "You Know, for Search"
+    }
+    ```
+    - Generate an enrollment token for Kibana >  ``` ./usr/share/elasticsearch/bin/elasticsearch-create-enrollment-token -s kibana ```
+    - Generate Kibana Encryption keys > ``` ./usr/share/kibana/bin/kibana-encryption-keys generate ```
+    - Edit Kibana configuration file > ``` sudo vim /etc/kibana/kibana.yml ```
+    ```
+    server.port: 5601
+    server.host: "0.0.0.0"
+    xpack.encryptedSavedObjects.encryptionKey: 12f746c01ac10190095ccc0fa710735c
+    xpack.reporting.encryptionKey: 223019dd8b4b45ccbfcb64d331403460
+    xpack.security.encryptionKey: 9588a38d34bdbea68faf4d8abcd29185
+
+    ```
+    ### 3. Install Nginx and configure the reverse proxy
+      - ``` sudo apt-get install nginx && sudo apt-get install apache2-utils```
+      - ``` sudo vim /etc/nginx/conf.d/kibana.conf ```
+      ```
+        server {
+      listen 8888 default_server;
+      listen [::]:8888 default_server;
+
+      location / {
+          proxy_pass http://192.168.1.35:5601;
+      }
+
+      location /test {
+          proxy_pass http://localhost:5601;
+      }
+    }
+    ```
+    - install Logstash & start > ``` sudo apt install logstash && sudo systemctl start logstash ```
+    ### 4. Install Metricbeat and configure it
+    - ``` sudo apt install metricbeat=8.2.0 ```
+    - Edit Metricbeat configuration file > ``` sudo vim /etc/metricbeat/metricbeat.yml ```
+    ```
+    host: "localhost:5601"
+    output.elasticsearch:
+    hosts: ["localhost:9200"]
+    username: "elastic"
+    password: "b5pJ6A+6ylmJ7s1HMmLk"
+    ```
+    - enable nginx module ``` metricbeat modules enable nginx```
+    - Then, we can customize the metrics we want to track by modifying ```sudo vim /etc/metricbeat/modules.d/system.yml```
+    - then start it ``` sudo service metricbeat start && metricbeat setup -e``` > **see the result in dashboard**
+    
+  ### 5. Install Filebeat and configure it
+  - install Filebeat ``` sudo apt install filebeat ``` 
+  - ```filebeat modules enable system``` **you have to enable syslog and audit filesets in the file ```modules.d/system.yml```**
+  - Configure it > ``` vim /etc/filebeat/filebeat.yml ```
+  ```
+  output.elasticsearch:
+  hosts: ["localhost:9200"]
+  username: "elastic"
+  password: "b5pJ6A+6ylmJ7s1HMmLk"
+  allow_older_versions: true # because we use ELK 8.2.0 V
+  ```
+  - finally run it > ```sudo service filebeat start && filebeat setup -e ```
+  ### . Install Heartbeat and configure it
+  - ``` sudo apt install heartbeat-elastic ``` then configure it ``` vim /etc/heartbeat/heartbeat.yml ```
+  ```
+  heartbeat.monitors:
+- type: http
+  # Set enabled to true (or delete the following line) to enable this example monitor
+  enabled: true
+  # ID used to uniquely identify this monitor in elasticsearch even if the config changes
+  id: my-monitor
+  # Human readable display name for this service in Uptime UI and elsewhere
+  name: My Monitor
+  # List or urls to query
+  urls: ["http://localhost:9200"]
+  # Configure task schedule
+  schedule: '@every 10s'
+  # Total test connection and data exchange timeout
+  #timeout: 16s
+  # Name of corresponding APM service, if Elastic APM is in use for the monitored service.
+  #service.name: my-apm-service-name
+- type: icmp
+  schedule: '*/5 * * * * * *'
+  hosts: ["192.168.1.35:9200"]
+  id: my-icmp-service
+  name: My ICMP Service
+- type: tcp
+  schedule: '@every 5s'
+  hosts: ["192.168.1.35:12345"]
+  mode: any
+  id: my-tcp-service
+  # Kibana
+  setup.kibana:
+  host: "localhost:5601"
+  # Elasticsearch
+  output.elasticsearch:
+  # Array of hosts to connect to.
+  hosts: ["localhost:9200"]
+  username: "elastic"
+  password: "b5pJ6A+6ylmJ7s1HMmLk"
+  allow_older_versions: true
+  ```
+  - Finally run it > ``` sudo service metricbeat start && heartbeat-elastic -e ```
+  ### 6. Dashboard 1
+  ![ssh-dashboard](https://user-images.githubusercontent.com/38042656/200446446-b327be83-dc7d-48ee-b562-1d7e10b00658.png)
+  ### 7. Dashboard 2
+  ![dashboard2](https://user-images.githubusercontent.com/38042656/200446492-8dfb3e0c-1664-478c-972e-3dfbb1cbad83.png)
+  ### 8. Alerting purposes (elastaert2 with Docker-Compose) to be continue...
