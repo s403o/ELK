@@ -152,3 +152,106 @@
   ### 7. Dashboard 2
   ![dashboard2](https://user-images.githubusercontent.com/38042656/200446492-8dfb3e0c-1664-478c-972e-3dfbb1cbad83.png)
   ### 8. Alerting purposes (elastaert2 with Docker-Compose) to be continue...
+  - docker-compose.yml
+  - make sure to run this command before run compose to fix problems when run kibana``` sudo sysctl -w vm.max_map_count=262144 ``` 
+  - ``` docker-compose up -d ``` 
+  ```
+  version: '2.2'
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.1.1
+    container_name: elasticsearch
+    environment:
+      - node.name=elasticsearch
+      - discovery.seed_hosts=elasticsearch
+      - cluster.initial_master_nodes=elasticsearch
+      - cluster.name=docker-cluster
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - esdata1:/usr/share/elasticsearch/data
+    ports:
+      - 9200:9200
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.1.1
+    container_name: kibana
+    environment:
+      ELASTICSEARCH_URL: "http://elasticsearch:9200"
+    ports:
+      - 5601:5601
+    depends_on:
+      - elasticsearch
+
+volumes:
+  esdata1:
+    driver: local
+  ```
+  - Configure Filebeat and enable system module ``` sudo vi /etc/filebeat/filebeat.yml ``` (edit kibana and elasticsearch url to your host)
+  ### Install and setup elastalert
+  - 
+    ```
+    sudo apt-get install -y python
+    sudo apt-get install -y python-pip python-dev libffi-dev libssl-dev
+    git clone https://github.com/Yelp/elastalert.git
+    cd elastalert
+    sudo pip install "setuptools>=11.3"
+    sudo pip install pyOpenSSL
+    sudo python setup.py install
+    sudo pip install "elasticsearch>=5.0.0"
+    cp config.example.yaml config.yaml
+    ```
+  ### Alert rule to send an email when the VM CPU average is higher than 50% for the
+last 5 min.
+  - ```
+      name: CPU spike
+      type: spike
+      index: logstash-*
+      threshold: 1
+      timeframe:
+          minutes: 5
+      spike_height: 2
+      spike_type: "up"
+
+          filter:
+          - range:
+              cpuLoad:
+                  from: 3.0
+                  to: 55.0
+
+          alert:
+          - "email"
+          email:
+          - "eslam.adel.me@gmail.com.com"          
+          from_addr: "test@task.com"
+          alert_subject: "CPU - ERROR detected greater than 50%."
+          alert_subject_args:
+          - "@timestamp"
+          alert_text: "Hello Team, ERROR event(s) detected in last 5 minutes."
+          alert_text_type: alert_text_only 
+    ```
+   - Postfix Gmail SMTP
+   - install postfix ``` sudo apt-get install postfix mailutils libsasl2-2 ca-certificates libsasl2-modules```
+   - Postfix configuration to add
+   ```
+    relayhost = [smtp.gmail.com]:587
+    smtp_sasl_auth_enable = yes
+    smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd
+    smtp_sasl_security_options = noanonymous
+    smtp_tls_CApath = /etc/ssl/certs
+    smtpd_tls_CApath = /etc/ssl/certs
+    smtp_use_tls = yes
+   ```
+   - Add sasl_passwd
+   ``` 
+   [smtp.gmail.com]:587	eslam.adel.me@gmail.com:password_generated_from_2fa_app
+   ```
+   ```
+  sudo chmod 400 /etc/postfix/sasl_passwd
+  sudo postmap /etc/postfix/sasl_passwd
+  sudo systemctl restart postfix
+   ``` 
