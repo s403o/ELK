@@ -283,3 +283,7 @@ alert_subject_args:
 alert_text: "Hello Team, ERROR event(s) detected in last 5 minutes."
 alert_text_type: alert_text_only
    ```
+- testing rules & running elastlert
+
+   ``` elastalert-test-rule --config config.yaml rules/rule.yaml ```  
+   ``` python -m elastalert.elastalert --verbose --rule  rules/rule.yaml ```
