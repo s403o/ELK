@@ -205,8 +205,7 @@ volumes:
     sudo pip install "elasticsearch>=5.0.0"
     cp config.example.yaml config.yaml
     ```
-  ### Alert rule to send an email when the VM CPU average is higher than 50% for the
-last 5 min.
+  ### Alert rule to send an email when the VM CPU average is higher than 50% for the last 5 min.
   - ```
       name: CPU spike
       type: spike
@@ -255,3 +254,32 @@ last 5 min.
   sudo postmap /etc/postfix/sasl_passwd
   sudo systemctl restart postfix
    ``` 
+   ### send an email when any heartbeat monitor failed once in the last 5 mins.
+   ```
+   name: Sites Down
+description: Site pings returned down more than once in lat 5 minutes.
+type: frequency
+index: heartbeat-*
+num_events: 2
+timeframe:
+  minutes: 5
+filter:
+- query:
+    query_string:
+      query: "(monitor.status: down) AND !(monitor.name: http)"    
+realert: 
+  hours: 1
+exponential_realert:
+  hours: 8
+
+alert:
+- "email"
+email:
+- "eslam.adel.me@gmail.com.com"          
+from_addr: "test@task.com"
+alert_subject: "Site down"
+alert_subject_args:
+- "@timestamp"
+alert_text: "Hello Team, ERROR event(s) detected in last 5 minutes."
+alert_text_type: alert_text_only
+   ```
